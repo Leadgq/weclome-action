@@ -1,0 +1,21 @@
+{
+  "name": "@welcome/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dev": "node --watch --experimental-strip-types src/server.ts",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@welcome/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "22.19.0"
+  }
+}

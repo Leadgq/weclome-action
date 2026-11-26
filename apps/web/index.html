@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f6f5ef" />
+    <title>初见 · Hello, World</title>
+    <script type="module" src="/src/main.ts"></script>
+  </head>
+  <body>
+    <div class="page">
+      <header class="header">
+        <a class="brand" href="/" aria-label="初见首页">
+          <span class="brand-symbol" aria-hidden="true"></span>
+          初见<span class="brand-en">FIRST LIGHT</span>
+        </a>
+        <span class="site-label">一个小小的开始</span>
+      </header>
+
+      <main>
+        <section class="hero" aria-labelledby="welcome-heading">
+          <div class="hero-copy">
+            <p class="eyebrow">HELLO, WORLD.</p>
+            <h1 id="welcome-heading">
+              你好，世界。<br />
+              <span>很高兴遇见你。</span>
+            </h1>
+            <p class="introduction">
+              欢迎来到我的小小站点。<br />
+              从这一页开始，让想法慢慢变成现实。
+            </p>
+            <a class="primary-link" href="#connection">
+              向服务器打个招呼
+              <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+
+          <div class="art" aria-hidden="true">
+            <div class="orbit orbit-one"></div>
+            <div class="orbit orbit-two"></div>
+            <div class="sun"></div>
+            <div class="horizon"></div>
+            <div class="art-caption">EVERYTHING STARTS WITH A HELLO.</div>
+          </div>
+        </section>
+
+        <section id="connection" class="connection-panel" aria-labelledby="connection-heading">
+          <div class="connection-copy">
+            <p class="eyebrow">LET'S CONNECT</p>
+            <h2 id="connection-heading">让第一声问候，真正抵达。</h2>
+            <p>点一下按钮，接收一条来自服务器的回应。</p>
+          </div>
+          <div class="connection-action">
+            <button id="hello-button" type="button">
+              发送 Hello
+              <span aria-hidden="true">→</span>
+            </button>
+            <span id="connection-status" class="connection-status" role="status">等待你的第一声问候</span>
+          </div>
+          <div id="response" class="response" hidden aria-live="polite">
+            <p id="response-message"></p>
+            <span id="response-time"></span>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer">
+        <span>初见 · 欢迎页测试站点</span>
+        <span>小小一步，新的开始。</span>
+      </footer>
+    </div>
+  </body>
+</html>

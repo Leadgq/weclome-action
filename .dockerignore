@@ -1,0 +1,9 @@
+**/node_modules
+**/dist
+.git
+api
+web
+.deploy
+*.tar.gz
+releases/
+current-web

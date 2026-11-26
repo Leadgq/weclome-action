@@ -1,0 +1,17 @@
+{
+  "name": "@welcome/web",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "dev": "vite --host 127.0.0.1"
+  },
+  "dependencies": {
+    "@welcome/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "vite": "6.4.1"
+  }
+}
