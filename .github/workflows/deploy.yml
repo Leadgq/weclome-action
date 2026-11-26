@@ -1,0 +1,129 @@
+name: Deploy welcome-demo
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# 发布串行进行，避免后一次推送中断正在切换的站点。
+concurrency:
+  group: welcome-demo-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+      DEPLOY_PORT: ${{ vars.DEPLOY_PORT || '22' }}
+      DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+      DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        # pnpm 版本读取 package.json 中的 packageManager。
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace
+        run: pnpm build
+
+      - name: Typecheck workspace
+        run: pnpm typecheck
+
+      - name: Validate deployment settings
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in DEPLOY_HOST DEPLOY_USER DEPLOY_SSH_KEY DEPLOY_KNOWN_HOSTS; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing repository secret: $name"
+              exit 1
+            fi
+          done
+          if [[ ! "$DEPLOY_HOST" =~ ^[A-Za-z0-9][A-Za-z0-9.-]*$ ]]; then
+            echo '::error::DEPLOY_HOST must be an IPv4 address or hostname'
+            exit 1
+          fi
+          if [[ ! "$DEPLOY_USER" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
+            echo '::error::Invalid DEPLOY_USER'
+            exit 1
+          fi
+          if [[ ! "$DEPLOY_PORT" =~ ^[0-9]+$ ]]; then
+            echo '::error::DEPLOY_PORT must be a port number'
+            exit 1
+          fi
+
+      - name: Package source
+        shell: bash
+        run: |
+          set -euo pipefail
+          # 上传源码和锁文件，由服务器 Docker 构建 Linux 运行产物。
+          # 不包含 .git、密钥、node_modules、dist 或旧版 api/web 目录。
+          tar -czf "$RUNNER_TEMP/welcome-demo.tar.gz" \
+            --exclude=node_modules --exclude=dist --exclude=.deploy \
+            package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json \
+            Dockerfile .dockerignore compose.yaml nginx.conf apps packages deploy
+
+      - name: Upload and deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          key_file="$RUNNER_TEMP/welcome-demo-deploy-key"
+          known_hosts_file="$RUNNER_TEMP/welcome-demo-known-hosts"
+          trap 'rm -f "$key_file" "$known_hosts_file"' EXIT
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$key_file"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$known_hosts_file"
+          ssh_options=(
+            -i "$key_file"
+            -o BatchMode=yes
+            -o IdentitiesOnly=yes
+            -o StrictHostKeyChecking=yes
+            -o "UserKnownHostsFile=$known_hosts_file"
+            -o ConnectTimeout=15
+            -o ServerAliveInterval=15
+            -o ServerAliveCountMax=4
+          )
+          remote_archive="/tmp/welcome-demo-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}.tar.gz"
+          scp "${ssh_options[@]}" -P "$DEPLOY_PORT" \
+            "$RUNNER_TEMP/welcome-demo.tar.gz" \
+            "$DEPLOY_USER@$DEPLOY_HOST:$remote_archive"
+          ssh "${ssh_options[@]}" -p "$DEPLOY_PORT" \
+            "$DEPLOY_USER@$DEPLOY_HOST" bash -s -- "$remote_archive" <<'REMOTE'
+          set -euo pipefail
+          archive="$1"
+          app_dir=/opt/welcome-demo
+          test -d "$app_dir"
+          # 同时防止手动发布和其他工作流覆盖本次正在使用的源码。
+          exec 9>/var/lock/welcome-demo-deploy.lock
+          flock -w 1200 9
+          backup_dir="/opt/welcome-demo-backups/source-$(date -u +%Y%m%dT%H%M%SZ)"
+          mkdir -p "$backup_dir"
+          tar -czf "$backup_dir/source.tar.gz" \
+            --exclude=./releases --exclude=./current-web --exclude=./web \
+            --exclude=./.git --exclude=node_modules --exclude=dist --exclude=.deploy \
+            -C "$app_dir" .
+          tar -xzf "$archive" -C "$app_dir"
+          bash -n "$app_dir/deploy/server.sh"
+          bash "$app_dir/deploy/server.sh"
+          rm -f "$archive"
+          REMOTE
